@@ -1,43 +1,63 @@
 #include "search.h"
 
-/* TODO 1: bad-character дүрмийн right хүснэгтийг байгуул.
- * Байхгүй байт бүрт -1; байвал хамгийн сүүлийн индексийг хадгална.
- * Зорилт: O(256+m) хугацаа.
- */
+/* Bad-character хүснэгт байгуулах */
 void bm_build_rightmost(const unsigned char *pattern, size_t m,
                         ptrdiff_t right[256])
 {
-    (void)pattern;
-    (void)m;
     for (size_t c = 0; c < 256; ++c)
         right[c] = -1;
-    /* TODO: pattern-ийг ашиглан хүснэгтээ гүйцээ. */
+
+    for (size_t j = 0; j < m; ++j)
+        right[pattern[j]] = (ptrdiff_t)j;
 }
 
-/* TODO 2: Boyer-Moore-ийн bad-character хувилбарыг хэрэгжүүл.
- *
- * - search.h дахь оролт болон буцаах утгын гэрээг мөрдөнө.
- * - Pattern-ийг баруунаас зүүн тийш харьцуулна.
- * - Үл таарсан тэмдэгт болон right хүснэгтээр шилжилтээ тооцно.
- * - Алхам үргэлж эерэг байна; size_t-ийн хасалт/нэмэлтийн хязгаарыг
- *   шалгана. m>n үед n-m гэж тооцохоос өмнө буцна.
- * - Бүтэн match бүрт emit(start, context) дуудна. Давхцсан олдцыг
- *   хадгалахын тулд бүтэн match-ийн дараа нэг байрлалаар шилжинэ.
- *
- * Энэ лабораторид good-suffix дүрэм шаардахгүй.
- * Бэлтгэл O(256+m), хайлтын хамгийн муу хугацаа O(n*m).
- * Нэмэлт санах ой O(256). Emit-ийн өөрийн ажлыг хугацаанд оруулаагүй.
- * main() аль хэдийн -i сонголтын нормчлолыг хийсэн байна.
- */
+/* Boyer-Moore bad-character хайлт */
 int search_all(const unsigned char *text, size_t n,
                const unsigned char *pattern, size_t m,
                match_fn emit, void *context)
 {
-    (void)text;
-    (void)n;
-    (void)pattern;
-    (void)m;
-    (void)emit;
-    (void)context;
-    return SEARCH_NOT_IMPLEMENTED;
+    if (m == 0 || pattern == NULL || emit == NULL ||
+        (n > 0 && text == NULL) || m > (size_t)PTRDIFF_MAX) {
+        return SEARCH_BAD_ARGUMENT;
+    }
+
+    if (n == 0 || m > n)
+        return SEARCH_OK;
+
+    ptrdiff_t right[256];
+    bm_build_rightmost(pattern, m, right);
+
+    size_t s = 0;
+    size_t last = n - m;
+
+    while (s <= last) {
+        size_t j = m;
+
+        while (j > 0 && pattern[j - 1] == text[s + j - 1])
+            --j;
+
+        size_t shift;
+
+        if (j == 0) {
+            if (emit(s, context) != 0)
+                return SEARCH_OUTPUT_ERROR;
+
+            shift = 1;
+        } else {
+            size_t mismatch = j - 1;
+            unsigned char c = text[s + mismatch];
+
+            ptrdiff_t r = right[c];
+            ptrdiff_t distance = (ptrdiff_t)mismatch - r;
+
+            shift = distance > 0 ? (size_t)distance : 1;
+        }
+
+        if (shift > last - s)
+            break;
+
+        s += shift;
+    }
+
+    return SEARCH_OK;
 }
